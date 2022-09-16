@@ -71,4 +71,152 @@ defmodule MessageTest do
       assert length(player2_messages) == 3
     end
   end
+
+  describe "split_messages_on_offer" do
+    setup do
+      %{
+        messages: [
+          Message.new_offer("player1", 15, 15),
+          Message.new_buy("player2", "player1", 5),
+          Message.new_buy("player3", "player1", 10),
+          Message.new_buy("player4", "player1", 15),
+          Message.new_offer("player1", 5, 20),
+          Message.new_buy("player5", "player1", 5),
+          Message.new_buy("player3", "player1", 10)
+        ]
+      }
+    end
+
+    test "returns a list", %{messages: messages} do
+      splitted = Message.split_messages_on_offer(messages)
+      assert is_list(splitted)
+    end
+
+    test "the list has correct length", %{messages: messages} do
+      splitted = Message.split_messages_on_offer(messages)
+      assert length(splitted) == 2
+    end
+
+    test "the elements are also lists with correct lengths", %{messages: messages} do
+      [first | [second]] = Message.split_messages_on_offer(messages)
+      assert is_list(first)
+      assert length(first) == 3
+      assert is_list(second)
+      assert length(second) == 4
+    end
+
+    test "first element in each list is offer", %{messages: messages} do
+      [first | [second]] = Message.split_messages_on_offer(messages)
+      [%{:type => :offer} | _] = first
+      [%{:type => :offer} | _] = second
+    end
+  end
+
+  describe "message_queue_to_transaction" do
+    setup do
+      %{
+        messages: [
+          %Message{
+            type: :offer,
+            from: "player1",
+            amount: 50,
+            price: 10,
+            time: ~N[2022-09-16 10:00:00]
+          },
+          %Message{
+            type: :offer,
+            from: "player2",
+            amount: 20,
+            price: 15,
+            time: ~N[2022-09-16 10:10:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player2",
+            to: "player1",
+            amount: 20,
+            time: ~N[2022-09-16 10:20:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player3",
+            to: "player1",
+            amount: 35,
+            time: ~N[2022-09-16 10:30:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player4",
+            to: "player2",
+            amount: 15,
+            time: ~N[2022-09-16 10:40:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player5",
+            to: "player2",
+            amount: 20,
+            time: ~N[2022-09-16 10:50:00]
+          },
+          %Message{
+            type: :offer,
+            from: "player1",
+            amount: 15,
+            price: 15,
+            time: ~N[2022-09-16 11:00:00]
+          },
+          %Message{
+            type: :offer,
+            from: "player3",
+            amount: 30,
+            price: 30,
+            time: ~N[2022-09-16 11:10:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player2",
+            to: "player1",
+            amount: 15,
+            time: ~N[2022-09-16 11:20:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player3",
+            to: "player1",
+            amount: 10,
+            time: ~N[2022-09-16 11:30:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player4",
+            to: "player3",
+            amount: 10,
+            time: ~N[2022-09-16 11:40:00]
+          },
+          %Message{
+            type: :buy,
+            from: "player5",
+            to: "player3",
+            amount: 10,
+            time: ~N[2022-09-16 11:50:00]
+          }
+        ]
+      }
+    end
+
+    test "returns a list", %{messages: messages} do
+      transactions = Message.message_queue_to_transaction(messages)
+      assert is_list(transactions)
+    end
+
+    test "it has correct length", %{messages: messages} do
+      transactions = Message.message_queue_to_transaction(messages)
+      assert length(transactions) == 7
+    end
+
+    test "all elements are transaction", %{messages: messages} do
+      transactions = Message.message_queue_to_transaction(messages)
+      assert Enum.all?(transactions, &(&1.__struct__ == SupplyChain.Core.Transaction))
+    end
+  end
 end

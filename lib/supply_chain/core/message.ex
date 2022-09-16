@@ -75,11 +75,11 @@ defmodule SupplyChain.Core.Message do
   end
 
   defp add_message_to_seller(%{:type => :offer, from: seller} = message, acc) do
-    Map.put(acc, seller, [message | Map.fetch!(acc, seller)])
+    Map.put(acc, seller, Map.fetch!(acc, seller) ++ [message])
   end
 
   defp add_message_to_seller(%{:type => :buy, to: seller} = message, acc) do
-    Map.put(acc, seller, [message | Map.fetch!(acc, seller)])
+    Map.put(acc, seller, Map.fetch!(acc, seller) ++ [message])
   end
 
   @doc """
@@ -87,5 +87,33 @@ defmodule SupplyChain.Core.Message do
   """
   def collect_messages_to_sellers(message_list) do
     Enum.reduce(message_list, %{}, &add_message_to_seller/2)
+  end
+
+  defp split_on_offer(%{:type => :offer} = message, acc) do
+    [[message] | acc]
+  end
+
+  defp split_on_offer(message, [first | tail]) do
+    [first ++ [message] | tail]
+  end
+
+  @doc """
+    Split a list of message. Expect the list to be sorted and from the same seller. The returned list start with an offer and the buy messages after that until the next offer
+  """
+  def split_messages_on_offer(message_list) do
+    Enum.reduce(message_list, [], &split_on_offer/2)
+  end
+
+  def message_queue_to_transaction(message_queue) do
+    message_queue
+    |> collect_messages_to_sellers()
+    |> Enum.map(fn {_, value} ->
+      value
+      |> Enum.sort(fn %{time: first_time}, %{time: second_time} ->
+        first_time < second_time
+      end)
+    end)
+    |> Enum.flat_map(&split_messages_on_offer/1)
+    |> Enum.flat_map(&create_transactions/1)
   end
 end
