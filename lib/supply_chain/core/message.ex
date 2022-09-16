@@ -64,9 +64,28 @@ defmodule SupplyChain.Core.Message do
     list
   end
 
+  defp add_message_to_seller(%{:type => :offer, from: seller} = message, acc)
+       when not is_map_key(acc, seller) do
+    Map.put(acc, seller, [message])
+  end
+
+  defp add_message_to_seller(%{:type => :buy, to: seller} = message, acc)
+       when not is_map_key(acc, seller) do
+    Map.put(acc, seller, [message])
+  end
+
+  defp add_message_to_seller(%{:type => :offer, from: seller} = message, acc) do
+    Map.put(acc, seller, [message | Map.fetch!(acc, seller)])
+  end
+
+  defp add_message_to_seller(%{:type => :buy, to: seller} = message, acc) do
+    Map.put(acc, seller, [message | Map.fetch!(acc, seller)])
+  end
+
   @doc """
     Create a map of messages by sellers. The keys of the map is the creators of offer and the value is a list of messages where either the offer message `from` field is same as the key or the buy message `to` field is same as the key.
   """
   def collect_messages_to_sellers(message_list) do
+    Enum.reduce(message_list, %{}, &add_message_to_seller/2)
   end
 end
