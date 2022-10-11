@@ -64,22 +64,20 @@ defmodule SupplyChain.Core.Message do
     list
   end
 
-  defp add_message_to_seller(%{:type => :offer, from: seller} = message, acc)
-       when not is_map_key(acc, seller) do
+  defp add_message_to_seller(seller, message, acc) when not is_map_key(acc, seller) do
     Map.put(acc, seller, [message])
   end
 
-  defp add_message_to_seller(%{:type => :buy, to: seller} = message, acc)
-       when not is_map_key(acc, seller) do
-    Map.put(acc, seller, [message])
+  defp add_message_to_seller(seller, message, acc) do
+    Map.put(acc, seller, Map.fetch!(acc, seller) ++ [message])
   end
 
   defp add_message_to_seller(%{:type => :offer, from: seller} = message, acc) do
-    Map.put(acc, seller, Map.fetch!(acc, seller) ++ [message])
+    add_message_to_seller(seller, message, acc)
   end
 
   defp add_message_to_seller(%{:type => :buy, to: seller} = message, acc) do
-    Map.put(acc, seller, Map.fetch!(acc, seller) ++ [message])
+    add_message_to_seller(seller, message, acc)
   end
 
   @doc """
@@ -91,6 +89,10 @@ defmodule SupplyChain.Core.Message do
 
   defp split_on_offer(%{:type => :offer} = message, acc) do
     [[message] | acc]
+  end
+
+  defp split_on_offer(message, [first | []]) do
+    [first ++ [message] | []]
   end
 
   defp split_on_offer(message, [first | tail]) do
