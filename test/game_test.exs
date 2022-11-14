@@ -6,16 +6,20 @@ defmodule GameTest do
     setup do
       %{
         game:
-          Game.new([], [
-            {"first_role", "factory"},
-            {"second_role", "first_role"},
-            {"third_role", "second_role"}
-          ])
+          Game.new(
+            [],
+            [
+              {"first_role", "factory"},
+              {"second_role", "first_role"},
+              {"third_role", "second_role"}
+            ],
+            []
+          )
       }
     end
 
     test "one player can join", %{game: game} do
-      game = Game.join(game, "player1")
+      {:ok, game} = Game.join(game, "player1")
       assert length(game.players["first_role"]) == 1
       [first_role_player | _] = game.players["first_role"]
       assert first_role_player.name == "player1"
@@ -23,20 +27,20 @@ defmodule GameTest do
     end
 
     test "one player can join for each role", %{game: game} do
-      game = Game.join(game, "player1")
-      game = Game.join(game, "player2")
-      game = Game.join(game, "player3")
+      {:ok, game} = Game.join(game, "player1")
+      {:ok, game} = Game.join(game, "player2")
+      {:ok, game} = Game.join(game, "player3")
       assert length(game.players["first_role"]) == 1
       assert length(game.players["second_role"]) == 1
       assert length(game.players["third_role"]) == 1
     end
 
     test "more then one player can join for each role", %{game: game} do
-      game = Game.join(game, "player1")
-      game = Game.join(game, "player2")
-      game = Game.join(game, "player3")
-      game = Game.join(game, "player4")
-      game = Game.join(game, "player5")
+      {:ok, game} = Game.join(game, "player1")
+      {:ok, game} = Game.join(game, "player2")
+      {:ok, game} = Game.join(game, "player3")
+      {:ok, game} = Game.join(game, "player4")
+      {:ok, game} = Game.join(game, "player5")
       assert length(game.players["first_role"]) == 2
       assert length(game.players["second_role"]) == 2
       [second_role_player | _] = game.players["second_role"]
@@ -44,12 +48,26 @@ defmodule GameTest do
       assert second_role_player.role == "second_role"
       assert length(game.players["third_role"]) == 1
     end
+
+    test "can't join more player with same name", %{game: game} do
+      {:ok, game} = Game.join(game, "player1")
+      {:error, :name_already_used} = Game.join(game, "player1")
+    end
   end
 
   describe "next_round" do
     setup do
       %{
-        game: Game.new([{1, 2}, {3, 4}, {5, 6}])
+        game:
+          Game.new(
+            [
+              {1, 2},
+              {3, 4},
+              {5, 6}
+            ],
+            [{"wholesale", "factory"}, {"retail", "wholesale"}],
+            []
+          )
       }
     end
 
@@ -98,6 +116,7 @@ defmodule GameTest do
     test "create correct transactions", %{game: game} do
       game =
         Game.join(game, "player1")
+        |> elem(1)
         |> Game.next_round()
         |> Game.send_message(:buy, "player1", "factory", 5)
         |> Game.next_round()
@@ -114,7 +133,7 @@ defmodule GameTest do
   describe "next_round function factory" do
     setup do
       %{
-        game: Game.new(fn -> {1, 2} end)
+        game: Game.new(fn -> {1, 2} end, [{"wholesale", "factory"}, {"retail", "wholesale"}], [])
       }
     end
 
@@ -152,7 +171,12 @@ defmodule GameTest do
   describe "send_message" do
     setup %{} do
       game =
-        Game.new([{10, 10}]) |> Game.join("player1") |> Game.join("player2") |> Game.next_round()
+        Game.new([{10, 10}], [{"wholesale", "factory"}, {"retail", "wholesale"}], [])
+        |> Game.join("player1")
+        |> elem(1)
+        |> Game.join("player2")
+        |> elem(1)
+        |> Game.next_round()
 
       %{
         game: game
@@ -183,9 +207,11 @@ defmodule GameTest do
   describe "show_offers_for_role" do
     setup %{} do
       game =
-        Game.new([{10, 10}])
+        Game.new([{10, 10}], [{"wholesale", "factory"}, {"retail", "wholesale"}], [])
         |> Game.join("player1")
+        |> elem(1)
         |> Game.join("player2")
+        |> elem(1)
         |> Game.next_round()
         |> Game.send_message(:buy, "player2", "factory", 10)
         |> Game.send_message(:offer, "player2", 5, 15)
@@ -217,6 +243,20 @@ defmodule GameTest do
       assert offer.from == "player2"
       assert offer.amount == 5
       assert offer.price == 15
+    end
+
+    test "show empty list when role not exists", %{game: game} do
+      offers = Game.show_offers_for_role(game, "rataile")
+      assert length(offers) == 0
+    end
+
+    test "show offers when factory is seller", %{game: game} do
+      offers = Game.show_offers_for_role(game, "wholesale")
+      assert length(offers) == 1
+      offer = Enum.at(offers, 0)
+      assert offer.from == "factory"
+      assert offer.amount == 10
+      assert offer.price == 10
     end
   end
 
