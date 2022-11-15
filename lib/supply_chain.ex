@@ -1,18 +1,7 @@
 defmodule SupplyChain do
-  @moduledoc """
-  Documentation for `SupplyChain`.
-  """
+  alias SupplyChain.Boundary.GameSession
 
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> SupplyChain.hello()
-      :world
-
-  """
-  def hello do
-    :world
+  def start_game(args) do
+    GameSession.new_game(args)
   end
 end

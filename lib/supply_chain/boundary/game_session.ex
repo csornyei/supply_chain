@@ -2,7 +2,30 @@ defmodule SupplyChain.Boundary.GameSession do
   alias SupplyChain.Core.{Game}
   use GenServer, restart: :transient
 
-  defstruct [:id, :game, :running]
+  defstruct [:game, :running]
+
+  def start_link(args) do
+    GenServer.start_link(
+      __MODULE__,
+      args,
+      name: via(random_id())
+    )
+  end
+
+  def via(id) do
+    {
+      :via,
+      Registry,
+      {SupplyChain.Registry.GameSession, id}
+    }
+  end
+
+  def new_game(args) do
+    DynamicSupervisor.start_child(
+      SupplyChain.Supervisor.GameSession,
+      {__MODULE__, args}
+    )
+  end
 
   def init(args) do
     factory = Keyword.fetch!(args, :factory)
@@ -10,7 +33,7 @@ defmodule SupplyChain.Boundary.GameSession do
     settings = Keyword.get(args, :settings, [])
 
     game = Game.new(factory, roles, settings)
-    state = %SupplyChain.Boundary.GameSession{id: random_id(), game: game, running: true}
+    state = %SupplyChain.Boundary.GameSession{game: game, running: true}
     {:ok, state}
   end
 
