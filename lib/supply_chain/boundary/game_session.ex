@@ -2,13 +2,17 @@ defmodule SupplyChain.Boundary.GameSession do
   alias SupplyChain.Core.{Game}
   use GenServer, restart: :transient
 
+  defstruct [:id, :game, :running]
+
   defstruct [:game, :running]
 
   def start_link(args) do
+    id = random_id()
+
     GenServer.start_link(
       __MODULE__,
-      args,
-      name: via(random_id())
+      args ++ [id: id],
+      name: via(id)
     )
   end
 
@@ -21,19 +25,24 @@ defmodule SupplyChain.Boundary.GameSession do
   end
 
   def new_game(args) do
+    {:ok, pid} =
     DynamicSupervisor.start_child(
       SupplyChain.Supervisor.GameSession,
       {__MODULE__, args}
     )
+
+    name = GenServer.call(pid, :id)
+    {:ok, name}
   end
 
   def init(args) do
+    id = Keyword.fetch!(args, :id)
     factory = Keyword.fetch!(args, :factory)
     roles = Keyword.get(args, :roles, [{"wholesale", "factory"}, {"retail", "wholesale"}])
     settings = Keyword.get(args, :settings, [])
 
     game = Game.new(factory, roles, settings)
-    state = %SupplyChain.Boundary.GameSession{game: game, running: true}
+    state = %SupplyChain.Boundary.GameSession{id: id, game: game, running: true}
     {:ok, state}
   end
 
@@ -66,13 +75,36 @@ defmodule SupplyChain.Boundary.GameSession do
     {:reply, state.game.messages, state}
   end
 
+  def handle_call(:id, _from, state) do
+    {:reply, state.id, state}
+  end
+
+  def handle_info(:next_round, state) do
+    GenServer.cast(self(), :next_round)
+    {:noreply, state}
+  end
+
   def handle_cast(:next_round, state) do
     game = Game.next_round(state.game)
     new_state = %SupplyChain.Boundary.GameSession{state | game: game}
 
+    if game.round == 1 do
+      DynamicSupervisor.start_child(
+        SupplyChain.Supervisor.GameSession,
+        {SupplyChain.Boundary.Timer, id: state.id}
+      )
+    end
+
     if is_list(game.factory) and game.round > length(game.factory) do
       {:stop, :normal, new_state}
     else
+      round_length = Keyword.fetch!(state.game.settings, :round_length)
+
+      GenServer.call(
+        SupplyChain.Boundary.Timer.via(state.id),
+        {:start_timer, round_length * 1000}
+      )
+
       {:noreply, new_state}
     end
   end
@@ -85,5 +117,9 @@ defmodule SupplyChain.Boundary.GameSession do
   def handle_cast({:buy, buyer, seller, amount}, state) do
     game = Game.send_message(state.game, :buy, buyer, seller, amount)
     {:noreply, %SupplyChain.Boundary.GameSession{state | game: game}}
+  end
+
+  def terminate(_, state) do
+    GenServer.stop(SupplyChain.Boundary.Timer.via(state.id), :normal)
   end
 end
