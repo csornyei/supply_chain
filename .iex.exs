@@ -1,6 +1,6 @@
 alias SupplyChain.Boundary.GameSession
 factory_list = [{1,2}, {3,4}, {5,6}]
-
+:observer.start
 
 
 test_fn = fn ->

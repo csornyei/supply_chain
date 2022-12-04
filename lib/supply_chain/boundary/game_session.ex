@@ -4,7 +4,72 @@ defmodule SupplyChain.Boundary.GameSession do
 
   defstruct [:id, :game, :running]
 
-  defstruct [:game, :running]
+  # API
+  @doc """
+    Let player join to the game with name
+
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test", "factory"}])
+    iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
+    iex> player.name
+    "test_player"
+    iex> player.role
+    "test"
+  """
+  def join(id, player_name) do
+    GenServer.call(via(id), {:join, player_name})
+  end
+
+  @doc """
+    Get offers for role
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test", "factory"}])
+  """
+  def get_offers_for_role(id, role_name) do
+    GenServer.call(via(id), {:get_offers, role_name})
+  end
+
+  @doc """
+    Get player current products and money
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test", "factory"}])
+    iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
+  """
+  def get_player_state(id, player_name) do
+    GenServer.call(via(id), {:get_state, player_name})
+  end
+
+  @doc """
+    Get messages in current round
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test", "factory"}])
+    iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
+  """
+  def get_messages(id) do
+    GenServer.call(via(id), :get_messages)
+  end
+
+  @doc """
+    Start new round
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test", "factory"}])
+  """
+  def next_round(id) do
+    GenServer.cast(via(id), :next_round)
+  end
+
+  @doc """
+    Send an offer message
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test", "factory"}])
+    iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
+  """
+  def send_offer_message(id, seller, amount, price) do
+    GenServer.cast(via(id), {:offer, seller, amount, price})
+  end
+
+  @doc """
+    Send a buy message
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test", "factory"}])
+    iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
+  """
+  def send_buy_message(id, buyer, seller, amount) do
+    GenServer.call(via(id), {:buy, buyer, seller, amount})
+  end
 
   def start_link(args) do
     id = random_id()
@@ -26,10 +91,10 @@ defmodule SupplyChain.Boundary.GameSession do
 
   def new_game(args) do
     {:ok, pid} =
-    DynamicSupervisor.start_child(
-      SupplyChain.Supervisor.GameSession,
-      {__MODULE__, args}
-    )
+      DynamicSupervisor.start_child(
+        SupplyChain.Supervisor.GameSession,
+        {__MODULE__, args}
+      )
 
     name = GenServer.call(pid, :id)
     {:ok, name}
