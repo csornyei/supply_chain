@@ -1,4 +1,5 @@
 defmodule GameTest do
+  alias SupplyChain.Core.Player
   use ExUnit.Case
   use TestSupport
 
@@ -295,6 +296,65 @@ defmodule GameTest do
       {product, money} = Game.get_player_current_state(game, "player1")
       assert product == 40
       assert money == 400
+    end
+  end
+
+  describe "change_role" do
+    setup %{} do
+      %{
+        game: %Game{
+          players: %{
+            "retail" => [%Player{name: "player1", role: "retail"}],
+            "wholesale" => [%Player{name: "player2", role: "wholesale"}]
+          },
+          transactions: [],
+          messages: [],
+          roles: [{"wholesale", "factory"}, {"retail", "wholesale"}],
+          factory: fn -> {10, 10} end,
+          round: 0,
+          settings: [starting_money: 1000, starting_products: 0]
+        }
+      }
+    end
+
+    test "only allow role change in 0th round", %{game: game} do
+      game = Game.next_round(game)
+      {:error, msg} = Game.change_role(game, "player1", "wholesale")
+
+      assert msg == :not_allowed
+    end
+
+    test "return error if player not exists", %{game: game} do
+      {:error, msg} = Game.change_role(game, "player3", "wholesale")
+
+      assert msg == :player_not_found
+    end
+
+    test "returns error if role not exists", %{game: game} do
+      {:error, msg} = Game.change_role(game, "player1", "not_existing_role")
+
+      assert msg == :role_not_found
+    end
+
+    test "removes player from old role", %{game: game} do
+      {:ok, game} = Game.change_role(game, "player1", "wholesale")
+
+      %{"retail" => retail} = game.players
+
+      assert length(retail) == 0
+    end
+
+    test "adds player to new role", %{game: game} do
+      {:ok, game} = Game.change_role(game, "player1", "wholesale")
+
+      %{"wholesale" => wholesale} = game.players
+
+      assert length(wholesale) == 2
+
+      player1 = Enum.find(wholesale, fn %Player{name: name} -> name == "player1" end)
+
+      assert player1 != nil
+      assert player1.role == "wholesale"
     end
   end
 end

@@ -71,6 +71,18 @@ defmodule SupplyChain.Boundary.GameSession do
     GenServer.call(via(id), {:buy, buyer, seller, amount})
   end
 
+  @doc """
+    Change player's role to `new_role` if player joined the game, role exists and it's still the 0th round
+
+    Example:
+    iex> {:ok, name} = SupplyChain.Boundary.GameSession.new_game(factory: [{1,2}], roles: [{"test1", "factory"}, {"test2", "test1"}])
+    iex> {:joined, %{role: "test1"} = player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
+    iex> {:role_changed, %{name: "test_player", role: "test2"}} = SupplyChain.Boundary.GameSession.change_role(name, "test_player", "test2")
+  """
+  def change_role(id, name, new_role) do
+    GenServer.call(via(id), {:change_role, name, new_role})
+  end
+
   def start_link(args) do
     id = random_id()
 
@@ -119,6 +131,17 @@ defmodule SupplyChain.Boundary.GameSession do
     case Game.join(state.game, name) do
       {:ok, game} ->
         {:reply, {:joined, Game.find_player(game, name) |> elem(1)},
+         %SupplyChain.Boundary.GameSession{state | game: game}}
+
+      {:error, msg} ->
+        {:reply, {:error, msg}, state}
+    end
+  end
+
+  def handle_call({:change_role, name, role_name}, _from, %{game: game} = state) do
+    case Game.change_role(game, name, role_name) do
+      {:ok, game} ->
+        {:reply, {:role_changed, Game.find_player(game, name) |> elem(1)},
          %SupplyChain.Boundary.GameSession{state | game: game}}
 
       {:error, msg} ->

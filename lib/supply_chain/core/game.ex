@@ -110,6 +110,53 @@ defmodule SupplyChain.Core.Game do
     {game, player}
   end
 
+  def change_role(%__MODULE__{round: round}, _, _) when round != 0 do
+    {:error, :not_allowed}
+  end
+
+  def change_role(game, player_name, role_name) do
+    case find_player(game, player_name) do
+      {_, nil} ->
+        {:error, :player_not_found}
+
+      {_, %Player{role: old_role_name} = player} ->
+        case Enum.find(game.roles, fn {name, _} -> name == role_name end) do
+          nil ->
+            {:error, :role_not_found}
+
+          _ ->
+            game = remove_player_from_role(game, player, old_role_name)
+
+            updated_player = %Player{player | role: role_name}
+
+            players = game.players
+
+            players = Map.put(players, role_name, [updated_player | players[role_name]])
+
+            {:ok,
+             %__MODULE__{
+               game
+               | players: players
+             }}
+        end
+    end
+  end
+
+  defp remove_player_from_role(
+         %__MODULE__{players: players} = game,
+         %Player{name: name},
+         old_role_name
+       ) do
+    new_players =
+      Enum.filter(players[old_role_name], fn %Player{name: player_name} -> name != player_name end)
+
+    players = game.players
+
+    players = Map.put(players, old_role_name, new_players)
+
+    %__MODULE__{game | players: players}
+  end
+
   defp get_next_round_starting_message(game)
        when is_list(game.factory) and game.round >= length(game.factory) do
     Message.new_offer("factory", 0, 0)
