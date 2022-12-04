@@ -2,7 +2,7 @@ defmodule SupplyChain.Boundary.GameSession do
   alias SupplyChain.Core.{Game}
   use GenServer, restart: :transient
 
-  defstruct [:id, :game, :running]
+  defstruct [:id, :game, :running, :idle_rounds]
 
   # API
   @doc """
@@ -119,7 +119,7 @@ defmodule SupplyChain.Boundary.GameSession do
     settings = Keyword.get(args, :settings, [])
 
     game = Game.new(factory, roles, settings)
-    state = %SupplyChain.Boundary.GameSession{id: id, game: game, running: true}
+    state = %SupplyChain.Boundary.GameSession{id: id, game: game, running: true, idle_rounds: 0}
     {:ok, state}
   end
 
@@ -186,14 +186,24 @@ defmodule SupplyChain.Boundary.GameSession do
     if is_list(game.factory) and game.round > length(game.factory) do
       {:stop, :normal, new_state}
     else
-      round_length = Keyword.fetch!(state.game.settings, :round_length)
+      if new_state.idle_rounds >= 8 do
+        {:stop, :normal, new_state}
+      else
+        new_state =
+          if length(state.game.messages) < 2,
+            do: %__MODULE__{new_state | idle_rounds: state.idle_rounds + 1}
 
-      GenServer.call(
-        SupplyChain.Boundary.Timer.via(state.id),
-        {:start_timer, round_length * 1000}
-      )
+        round_length = Keyword.fetch!(state.game.settings, :round_length)
 
-      {:noreply, new_state}
+        if round_length != -1 do
+          GenServer.call(
+            SupplyChain.Boundary.Timer.via(state.id),
+            {:start_timer, round_length * 1000}
+          )
+        end
+
+        {:noreply, new_state}
+      end
     end
   end
 
