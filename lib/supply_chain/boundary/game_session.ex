@@ -68,7 +68,7 @@ defmodule SupplyChain.Boundary.GameSession do
     iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
   """
   def send_buy_message(id, buyer, seller, amount) do
-    GenServer.call(via(id), {:buy, buyer, seller, amount})
+    GenServer.cast(via(id), {:buy, buyer, seller, amount})
   end
 
   @doc """
