@@ -1,11 +1,10 @@
 defmodule SupplyChain.Persistance.Message do
   use Ecto.Schema
   import Ecto.Changeset
-  import Ecto.Query, only: [from: 2]
   alias SupplyChain.Repo
 
-  @message_fields ~w[game_id type from to amount price]a
-  @timestamps ~w[inserted_at updated_at]a
+  @required_fields ~w[game_id type from amount]a
+  @message_fields ~w[to price]a
 
   schema "messages" do
     field(:game_id, :string)
@@ -20,8 +19,8 @@ defmodule SupplyChain.Persistance.Message do
 
   def changeset(fields) do
     %__MODULE__{}
-    |> cast(fields, @message_fields ++ @timestamps)
-    |> validate_required(@message_fields ++ @timestamps)
+    |> cast(fields, @message_fields ++ @required_fields)
+    |> validate_required(@required_fields)
   end
 
   def save_message(game_id, message, in_transaction \\ fn _message -> :ok end) do
@@ -33,11 +32,11 @@ defmodule SupplyChain.Persistance.Message do
           from: message.from,
           to: message.to,
           amount: message.amount,
-          price: message.price,
-          inserted_at: message.timestamp,
-          updated_at: message.timestamp
+          price: message.price
         }
+        |> IO.inspect()
         |> changeset()
+        |> IO.inspect()
         |> Repo.insert!()
 
         in_transaction.(message)
