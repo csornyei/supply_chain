@@ -55,12 +55,18 @@ defmodule SupplyChain.Core.Game do
     }
   end
 
-  def send_message(game, :buy, buyer, seller, amount) do
-    send_message(game, Message.new_buy(buyer, seller, amount))
+  def send_message(game, type, buyer, seller, amount, save_fn \\ fn _message -> :ok end)
+
+  def send_message(game, :buy, buyer, seller, amount, save_fn) do
+    message = Message.new_buy(buyer, seller, amount)
+    save_fn.(message)
+    send_message(game, message)
   end
 
-  def send_message(game, :offer, sender, amount, price) do
-    send_message(game, Message.new_offer(sender, amount, price))
+  def send_message(game, :offer, sender, amount, price, save_fn) do
+    message = Message.new_offer(sender, amount, price)
+    save_fn.(message)
+    send_message(game, message)
   end
 
   def show_offers_for_role(game, role_name) when not is_map_key(game.players, role_name) do

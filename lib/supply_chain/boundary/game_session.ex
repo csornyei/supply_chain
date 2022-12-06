@@ -1,4 +1,5 @@
 defmodule SupplyChain.Boundary.GameSession do
+  alias SupplyChain.Persistance.Message
   alias SupplyChain.Core.{Game}
   use GenServer, restart: :transient
 
@@ -59,7 +60,11 @@ defmodule SupplyChain.Boundary.GameSession do
     iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
   """
   def send_offer_message(id, seller, amount, price) do
-    GenServer.cast(via(id), {:offer, seller, amount, price})
+    save_fn = fn message ->
+      Message.save_message(id, message)
+    end
+
+    GenServer.cast(via(id), {:offer, seller, amount, price, save_fn})
   end
 
   @doc """
@@ -68,7 +73,11 @@ defmodule SupplyChain.Boundary.GameSession do
     iex> {:joined, player} = SupplyChain.Boundary.GameSession.join(name, "test_player")
   """
   def send_buy_message(id, buyer, seller, amount) do
-    GenServer.call(via(id), {:buy, buyer, seller, amount})
+    save_fn = fn message ->
+      Message.save_message(id, message)
+    end
+
+    GenServer.cast(via(id), {:buy, buyer, seller, amount, save_fn})
   end
 
   @doc """
@@ -190,8 +199,11 @@ defmodule SupplyChain.Boundary.GameSession do
         {:stop, :normal, new_state}
       else
         new_state =
-          if length(state.game.messages) < 2,
-            do: %__MODULE__{new_state | idle_rounds: state.idle_rounds + 1}
+          if length(state.game.messages) < 2 do
+            %__MODULE__{new_state | idle_rounds: state.idle_rounds + 1}
+          else
+            %__MODULE__{new_state | idle_rounds: 0}
+          end
 
         round_length = Keyword.fetch!(state.game.settings, :round_length)
 
@@ -207,13 +219,13 @@ defmodule SupplyChain.Boundary.GameSession do
     end
   end
 
-  def handle_cast({:offer, seller, amount, price}, state) do
-    game = Game.send_message(state.game, :offer, seller, amount, price)
+  def handle_cast({:offer, seller, amount, price, save_fn}, state) do
+    game = Game.send_message(state.game, :offer, seller, amount, price, save_fn)
     {:noreply, %SupplyChain.Boundary.GameSession{state | game: game}}
   end
 
-  def handle_cast({:buy, buyer, seller, amount}, state) do
-    game = Game.send_message(state.game, :buy, buyer, seller, amount)
+  def handle_cast({:buy, buyer, seller, amount, save_fn}, state) do
+    game = Game.send_message(state.game, :buy, buyer, seller, amount, save_fn)
     {:noreply, %SupplyChain.Boundary.GameSession{state | game: game}}
   end
 

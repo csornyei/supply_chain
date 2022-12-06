@@ -9,7 +9,8 @@ defmodule SupplyChain.Application do
   def start(_type, _args) do
     children = [
       {Registry, keys: :unique, name: SupplyChain.Registry.GameSession},
-      {DynamicSupervisor, name: SupplyChain.Supervisor.GameSession, strategy: :one_for_one}
+      {DynamicSupervisor, name: SupplyChain.Supervisor.GameSession, strategy: :one_for_one},
+      SupplyChain.Repo
     ]
 
     opts = [strategy: :one_for_one, name: SupplyChain.Supervisor]
