@@ -93,11 +93,11 @@ defmodule SupplyChain.Boundary.GameSession do
   end
 
   def start_link(args) do
-    id = random_id()
+    id = Keyword.fetch!(args, :id)
 
     GenServer.start_link(
       __MODULE__,
-      args ++ [id: id],
+      args,
       name: via(id)
     )
   end
@@ -111,14 +111,10 @@ defmodule SupplyChain.Boundary.GameSession do
   end
 
   def new_game(args) do
-    {:ok, pid} =
-      DynamicSupervisor.start_child(
-        SupplyChain.Supervisor.GameSession,
-        {__MODULE__, args}
-      )
-
-    name = GenServer.call(pid, :id)
-    {:ok, name}
+    DynamicSupervisor.start_child(
+      SupplyChain.Supervisor.GameSession,
+      {__MODULE__, args}
+    )
   end
 
   def init(args) do
@@ -130,10 +126,6 @@ defmodule SupplyChain.Boundary.GameSession do
     game = Game.new(factory, roles, settings)
     state = %SupplyChain.Boundary.GameSession{id: id, game: game, running: true, idle_rounds: 0}
     {:ok, state}
-  end
-
-  defp random_id do
-    :crypto.strong_rand_bytes(6) |> Base.url_encode64(padding: false)
   end
 
   def handle_call({:join, name}, _from, state) do
@@ -170,10 +162,6 @@ defmodule SupplyChain.Boundary.GameSession do
 
   def handle_call(:get_messages, _from, state) do
     {:reply, state.game.messages, state}
-  end
-
-  def handle_call(:id, _from, state) do
-    {:reply, state.id, state}
   end
 
   def handle_info(:next_round, state) do
